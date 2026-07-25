@@ -47,6 +47,13 @@ class Canvas extends Device{
       }
     }
 
+    $('#modal_canvas').on('shown.bs.modal', () => {
+      this.simulator.set_freq_limit(30);
+    });
+    $('#modal_canvas').on('hidden.bs.modal', () => {
+      this.simulator.set_freq_limit(1000);
+    });
+
     document.getElementById("canvas_reset").onclick = _ => {
       // this.ctx.scale(document.getElementById("canvas_scale_x").value, 
       //                document.getElementById("canvas_scale_y").value);
