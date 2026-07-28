@@ -1,8 +1,8 @@
 /*jshint esversion: 9 */
-import {Device} from "./utils.js";
+import { Device } from "./utils.js";
 
-class Canvas extends Device{
-  setup(){
+class Canvas extends Device {
+  setup() {
     this.addTab("Canvas", "fa-paint-brush", "canvas_device", `
     <!--  <div class="form-group">
     <label for="canvas_scale_x">Scale X</label>
@@ -41,24 +41,17 @@ class Canvas extends Device{
     `);
 
     document.getElementById("canvas_open_canvas").onclick = _ => {
-      if(!($("#modal_canvas").data('bs.modal') || {})._isShown){
-        $('#modal_canvas').modal({backdrop: false,show: true});
-        $('#modal_canvas').draggable({handle: ".modal-header"});
+      if (!Modal.isOpen('#modal_canvas')) {
+        Modal.open('#modal_canvas', { backdrop: false });
+        Modal.makeDraggable('#modal_canvas', '.modal-header');
       }
     }
-
-    $('#modal_canvas').on('shown.bs.modal', () => {
-      this.simulator.set_freq_limit(30);
-    });
-    $('#modal_canvas').on('hidden.bs.modal', () => {
-      this.simulator.set_freq_limit(1000);
-    });
 
     document.getElementById("canvas_reset").onclick = _ => {
       // this.ctx.scale(document.getElementById("canvas_scale_x").value, 
       //                document.getElementById("canvas_scale_y").value);
-      this.imageData = this.ctx.createImageData(document.getElementById("canvas_size_x").value, 
-                                                document.getElementById("canvas_size_y").value);
+      this.imageData = this.ctx.createImageData(document.getElementById("canvas_size_x").value,
+        document.getElementById("canvas_size_y").value);
       this.width = parseInt(document.getElementById("canvas_size_x").value);
     }
 
@@ -70,28 +63,28 @@ class Canvas extends Device{
     this.canvas.height = 512;
     this.width = 512;
 
-    setInterval(_=>{
+    setInterval(_ => {
       this.ctx.putImageData(this.imageData, 0, 0);
     }, 100);
-    var syscall =`
+    var syscall = `
       sendMessage({a0, a1, a2});
     `;
-    this.registerSyscall(2200, "Canvas setPixel", syscall, function (reg) {
-      const idx = (reg.a1*this.width + reg.a0)*4
-      this.imageData.data[idx + 0] = (reg.a2>>24)&0xFF ;  // R value
-      this.imageData.data[idx + 1] = (reg.a2>>16)&0xFF;    // G value
-      this.imageData.data[idx + 2] = (reg.a2>>8)&0xFF;  // B value
-      this.imageData.data[idx + 3] = reg.a2&0xFF;  // A value
+    this.registerSyscall(2200, "Canvas setPixel", syscall, function(reg) {
+      const idx = (reg.a1 * this.width + reg.a0) * 4
+      this.imageData.data[idx + 0] = (reg.a2 >> 24) & 0xFF;  // R value
+      this.imageData.data[idx + 1] = (reg.a2 >> 16) & 0xFF;    // G value
+      this.imageData.data[idx + 2] = (reg.a2 >> 8) & 0xFF;  // B value
+      this.imageData.data[idx + 3] = reg.a2 & 0xFF;  // A value
     }.bind(this));
-    this.registerSyscall(2201, "Canvas setCanvasSize", syscall, function (reg) {
+    this.registerSyscall(2201, "Canvas setCanvasSize", syscall, function(reg) {
       this.width = reg.a0;
       this.imageData = this.ctx.createImageData(reg.a0, reg.a1);
     }.bind(this));
-    this.registerSyscall(2202, "Canvas setScaling", syscall, function (reg) {
+    this.registerSyscall(2202, "Canvas setScaling", syscall, function(reg) {
       this.imageData = this.scaleImageData(this.imageData, reg.a0, reg.a1);
     }.bind(this));
 
-    this.bus.watchAddress(this.base_addr, function (value) {
+    this.bus.watchAddress(this.base_addr, function(value) {
       const size = this.bus.mmio.load(this.base_addr + 2, 2);
       const start = this.bus.mmio.load(this.base_addr + 4, 4);
       for (let i = 0; i < size; i++) {
@@ -106,25 +99,25 @@ class Canvas extends Device{
     // Create a temporary canvas to hold the original ImageData
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
-    
+
     // Set the temporary canvas dimensions to match the ImageData
     tempCanvas.width = imageData.width;
     tempCanvas.height = imageData.height;
-    
+
     // Put the original ImageData onto the temporary canvas
     tempCtx.putImageData(imageData, 0, 0);
-    
+
     // Create a new canvas with scaled dimensions
     const scaledCanvas = document.createElement('canvas');
     const scaledCtx = scaledCanvas.getContext('2d');
-    
+
     // Set the new canvas dimensions to the scaled size
     scaledCanvas.width = imageData.width * scaleX;
     scaledCanvas.height = imageData.height * scaleY;
-    
+
     // Use drawImage to scale the temporary canvas content onto the new canvas
     scaledCtx.drawImage(tempCanvas, 0, 0, imageData.width, imageData.height, 0, 0, scaledCanvas.width, scaledCanvas.height);
-    
+
     // Get the scaled ImageData from the new canvas
     return scaledCtx.getImageData(0, 0, scaledCanvas.width, scaledCanvas.height);
   }
