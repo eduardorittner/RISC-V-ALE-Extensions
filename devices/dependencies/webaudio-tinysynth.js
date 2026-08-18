@@ -1,3 +1,4 @@
+// @ts-nocheck -- vendored third-party library; not typed by this project.
 /*jshint esversion: 6 */
 "use strict";
 function WebAudioTinySynth(opt){
