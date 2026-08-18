@@ -1,6 +1,16 @@
 /*jshint esversion: 9 */
 import { Device } from "./utils.js";
 
+/**
+ * The canvas size fields, typed so their `value` is visible to the compiler.
+ *
+ * @param {string} id
+ * @returns {HTMLInputElement}
+ */
+function size_input(id) {
+  return /** @type {HTMLInputElement} */ (document.getElementById(id));
+}
+
 class Canvas extends Device {
   setup() {
     this.addTab("Canvas", "fa-paint-brush", "canvas_device", `
@@ -48,43 +58,45 @@ class Canvas extends Device {
     }
 
     document.getElementById("canvas_reset").onclick = _ => {
-      // this.ctx.scale(document.getElementById("canvas_scale_x").value, 
-      //                document.getElementById("canvas_scale_y").value);
-      this.imageData = this.ctx.createImageData(document.getElementById("canvas_size_x").value,
-        document.getElementById("canvas_size_y").value);
-      this.width = parseInt(document.getElementById("canvas_size_x").value);
+      this.imageData = this.ctx.createImageData(
+        parseInt(size_input("canvas_size_x").value),
+        parseInt(size_input("canvas_size_y").value),
+      );
+      this.width = parseInt(size_input("canvas_size_x").value);
     }
 
 
-    this.canvas = document.getElementById("canvas_device_canvas");
+    this.canvas = /** @type {HTMLCanvasElement} */ (
+      document.getElementById("canvas_device_canvas")
+    );
     this.ctx = this.canvas.getContext('2d');
     this.imageData = this.ctx.createImageData(512, 512);
     this.canvas.width = 512;
     this.canvas.height = 512;
     this.width = 512;
 
-    setInterval(_ => {
+    this.render_timer = setInterval(_ => {
       this.ctx.putImageData(this.imageData, 0, 0);
     }, 100);
     var syscall = `
       sendMessage({a0, a1, a2});
     `;
-    this.registerSyscall(2200, "Canvas setPixel", syscall, function(reg) {
+    this.registerSyscall(2200, "Canvas setPixel", syscall, (reg) => {
       const idx = (reg.a1 * this.width + reg.a0) * 4
       this.imageData.data[idx + 0] = (reg.a2 >> 24) & 0xFF;  // R value
       this.imageData.data[idx + 1] = (reg.a2 >> 16) & 0xFF;    // G value
       this.imageData.data[idx + 2] = (reg.a2 >> 8) & 0xFF;  // B value
       this.imageData.data[idx + 3] = reg.a2 & 0xFF;  // A value
-    }.bind(this));
-    this.registerSyscall(2201, "Canvas setCanvasSize", syscall, function(reg) {
+    });
+    this.registerSyscall(2201, "Canvas setCanvasSize", syscall, (reg) => {
       this.width = reg.a0;
       this.imageData = this.ctx.createImageData(reg.a0, reg.a1);
-    }.bind(this));
-    this.registerSyscall(2202, "Canvas setScaling", syscall, function(reg) {
+    });
+    this.registerSyscall(2202, "Canvas setScaling", syscall, (reg) => {
       this.imageData = this.scaleImageData(this.imageData, reg.a0, reg.a1);
-    }.bind(this));
+    });
 
-    this.bus.watchAddress(this.base_addr, function(value) {
+    this.bus.watchAddress(this.base_addr, (value) => {
       const size = this.bus.mmio.load(this.base_addr + 2, 2);
       const start = this.bus.mmio.load(this.base_addr + 4, 4);
       for (let i = 0; i < size; i++) {
@@ -92,7 +104,21 @@ class Canvas extends Device {
         this.imageData.data[start + i] = element;
       }
       this.bus.mmio.store(this.base_addr, 1, 0);
-    }.bind(this), 1, 1);
+    }, 1, 1);
+  }
+
+  /** The canvas owns a render timer and a modal on top of the defaults. */
+  teardown() {
+    if (this.render_timer) {
+      clearInterval(this.render_timer);
+      this.render_timer = null;
+    }
+    const modal = document.getElementById("modal_canvas");
+    if (modal) modal.remove();
+    this.canvas = null;
+    this.ctx = null;
+    this.imageData = null;
+    super.teardown();
   }
 
   scaleImageData(imageData, scaleX, scaleY) {

@@ -1,17 +1,35 @@
 /*jshint esversion: 9 */
 import {Device} from "./utils.js";
 
+/**
+ * The Unity build inside the iframe. Its API belongs to a third-party WebGL
+ * bundle, so there is nothing more precise to say about it than `any`.
+ *
+ * @param {string} id
+ * @returns {any}
+ */
+function unity_window(id) {
+  return /** @type {HTMLIFrameElement} */ (document.getElementById(id))
+    .contentWindow;
+}
+
 class Uoli_robot extends Device{
+  constructor(){
+    super();
+    /** The Unity instance, once the iframe has loaded. @type {any} */
+    this.unityModule = null;
+  }
+
   setup(){
     this.addTab("Uóli", "fa-robot", "uoli", `
       <iframe style="width:100%;height:100%" id="uoliWindow" src="./extensions/devices/dependencies/uoli-unity/index.html" frameborder="0"></iframe>
     `);
-    document.getElementById("uoliWindow").onload = (function(){
-      this.unityModule = document.getElementById("uoliWindow").contentWindow.unityInstance;
-      document.getElementById("uoliWindow").contentWindow.setUoliCallbacks(this.uoliStatus.bind(this), this.uoliSensorStatus.bind(this), function(){
+    document.getElementById("uoliWindow").onload = () => {
+      this.unityModule = unity_window("uoliWindow").unityInstance;
+      unity_window("uoliWindow").setUoliCallbacks(this.uoliStatus.bind(this), this.uoliSensorStatus.bind(this), () => {
         this.unityModule.SendMessage("walle", "keyboardInputToogle", 0);
-      }.bind(this));
-    }).bind(this);
+      });
+    };
     this.bus.mmio.store(0xFFFF0004, 4, 1);
     this.bus.mmio.store(0xFFFF0020, 4, 1);
     this.motorLastSentTorque = [undefined, undefined];
@@ -53,17 +71,17 @@ class Uoli_robot extends Device{
     }.bind(this), 4);
 
     // Ultrasonic sensor
-    this.bus.watchAddress(this.base_addr + 0x20, function(value){
+    this.bus.watchAddress(this.base_addr + 0x20, (value) => {
       if(value == 0) this.unityModule.SendMessage("walle", "getUltrasonic");
-    }.bind(this), 4);
+    }, 4);
 
-    this.onRun = function(){
+    this.onRun = () => {
       this.unityModule.SendMessage("walle", "keyboardInputToogle", 0);
       this.bus.mmio.store(0xFFFF0004, 4, 1);
       this.bus.mmio.store(0xFFFF0020, 4, 1);
       this.motorLastSentTorque = [undefined, undefined];
       this.servoLastSentRot = [undefined, undefined, undefined];
-    }.bind(this);
+    };
   }
 
   uoliStatus(rot, pos){

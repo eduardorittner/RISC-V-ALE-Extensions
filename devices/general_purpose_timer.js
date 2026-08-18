@@ -28,6 +28,16 @@ class General_Purpose_Timer extends Device{
       }
     });
   }
+
+  /** The timer owns a pending interrupt callback on top of the defaults. */
+  teardown(){
+    if(this.timerInt){
+      clearTimeout(this.timerInt);
+      this.timerInt = null;
+    }
+    this.int_timeout = 0;
+    super.teardown();
+  }
 }
 
 const general_purpose_timer = new General_Purpose_Timer();

@@ -1,43 +1,61 @@
 /*jshint esversion: 9 */
 import {Device} from "./utils.js";
 
+/**
+ * The Unity build inside the iframe. Its API belongs to a third-party WebGL
+ * bundle, so there is nothing more precise to say about it than `any`.
+ *
+ * @param {string} id
+ * @returns {any}
+ */
+function unity_window(id) {
+  return /** @type {HTMLIFrameElement} */ (document.getElementById(id))
+    .contentWindow;
+}
+
 class Car extends Device{
+  constructor(){
+    super();
+    /** The Unity instance, once the iframe has loaded. @type {any} */
+    this.unityModule = null;
+  }
+
   setup(){
     this.addTab("Self-Driving Car", "fa-car-side", "self_driving_car", `
     <iframe style="width:100%;height:100%" id="self_driving_car_window" src="./extensions/devices/dependencies/self_driving_car_unity/index.html" frameborder="0"></iframe>
     `);
-    document.getElementById("self_driving_car_window").onload = function(){
-      document.getElementById("self_driving_car_window").contentWindow.setCallbacks(this.status_callback.bind(this), this.sensor_callback.bind(this), this.camera_callback.bind(this), this.collision_callback.bind(this), function(){
-        this.unityModule = document.getElementById("self_driving_car_window").contentWindow.unityInstance;
+    document.getElementById("self_driving_car_window").onload = () => {
+      unity_window("self_driving_car_window").setCallbacks(this.status_callback.bind(this), this.sensor_callback.bind(this), this.camera_callback.bind(this), this.collision_callback.bind(this), () => {
+        this.unityModule = unity_window("self_driving_car_window").unityInstance;
         this.unityModule.SendMessage("Control", "setControls", 3);
         this.unityModule.SendMessage("car", "setStatus", "0.3129841089248657,183.72621154785156,359.99310302734375,-19.922077178955078,0.9621117115020752,-34.62373352050781");
-        this.bus.watchAddress(this.base_addr, function (value) {
+        this.bus.watchAddress(this.base_addr, (value) => {
           if(value == 1) this.unityModule.SendMessage("car", "getStatus");
-        }.bind(this), 1);
-    
-        this.bus.watchAddress(this.base_addr + 1, function (value) {
+        }, 1);
+
+        this.bus.watchAddress(this.base_addr + 1, (value) => {
           if(value == 1) this.unityModule.SendMessage("car", "readLineCamera");
-        }.bind(this), 1);
-    
-        this.bus.watchAddress(this.base_addr + 2, function (value) {
+        }, 1);
+
+        this.bus.watchAddress(this.base_addr + 2, (value) => {
           if(value != 0) this.unityModule.SendMessage("car", "getDistanceSensor", value - 2);
-        }.bind(this), 1);
-    
-        this.bus.watchAddress(this.base_addr + 32, function (value) {
-          value = ((value|0)<<24)>>24;
+        }, 1);
+
+        this.bus.watchAddress(this.base_addr + 32, (raw) => {
+          const value = ((raw|0)<<24)>>24;
           this.unityModule.SendMessage("Control", "setHorizontal", value/128);
-        }.bind(this), 1);
-    
-        this.bus.watchAddress(this.base_addr + 33, function (value) {
-          if(value == 0xFF) value = -1;
+        }, 1);
+
+        this.bus.watchAddress(this.base_addr + 33, (raw) => {
+          const value = raw == 0xFF ? -1 : raw;
           this.unityModule.SendMessage("Control", "setVertical", value);
-        }.bind(this), 1);
-    
-        this.bus.watchAddress(this.base_addr + 34, function (value) {
+        }, 1);
+
+        this.bus.watchAddress(this.base_addr + 34, (value) => {
           this.unityModule.SendMessage("Control", "setHandBrake", value);
-        }.bind(this), 1);
-      }.bind(this));
-    }.bind(this);
+        }, 1);
+      });
+    };
     
 
     var syscallControls =`

@@ -12,29 +12,33 @@ class Serial_Port extends Device{
     }
 
     this.stdio_ch = new BroadcastChannel("stdio_channel" + window.uniq_id);
-    this.stdio_ch.onmessage = function (e) {
-      if(e.data.fh==0){ // stdin
-        this.stdin_buffer += e.data.data;
-      }else if(e.data.init_stdin){
-        this.stdin_buffer = e.data.data;
+    this.stdio_ch.onmessage = (e) => {
+      /** @type {StdioChannelMessage} */
+      const data = e.data;
+      if(data.fh == 0){ // stdin
+        this.stdin_buffer += data.data;
+      }else if(data.fh === -1 && "init_stdin" in data){
+        this.stdin_buffer = data.data;
       }
-    }.bind(this);
+    };
 
     // port 1: stdout
-    this.bus.watchAddress(this.base_addr, function (value) {
+    this.bus.watchAddress(this.base_addr, (value) => {
       const char = String.fromCharCode(this.bus.mmio.load(this.base_addr + 1, 1));
       if(char == "\n"){
-        this.stdio_ch.postMessage({fh:1, data:this.stdout_buffer});
+        this.stdio_ch.postMessage(
+          /** @type {StdioChannelMessage} */ ({fh: 1, data: this.stdout_buffer}),
+        );
         this.stdout_buffer = "";
       }else{
         this.stdout_buffer += char;
       }
       this.bus.mmio.store(this.base_addr, 1, 0);
-    }.bind(this), 1, 1);
+    }, 1, 1);
 
 
     // port 2: stdin
-    this.bus.watchAddress(this.base_addr + 2, function (value) {
+    this.bus.watchAddress(this.base_addr + 2, (value) => {
       if(this.stdin_buffer.length == 0){
         this.bus.mmio.store(this.base_addr + 3, 1, 0);
       }else{
@@ -42,7 +46,16 @@ class Serial_Port extends Device{
         this.stdin_buffer = this.stdin_buffer.slice(1);
       }
       this.bus.mmio.store(this.base_addr + 2, 1, 0);
-    }.bind(this), 1, 1);
+    }, 1, 1);
+  }
+
+  /** The serial port owns a stdio channel on top of the defaults. */
+  teardown(){
+    if(this.stdio_ch){
+      this.stdio_ch.close();
+      this.stdio_ch = null;
+    }
+    super.teardown();
   }
 }
 
